@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Katharmonya Event</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <h1>KATHARMONYA<br>EVENT</h1>
+
+    <section class="panel">
+      <form id="rsvp" novalidate>
+        <label for="name">Your name</label>
+        <input id="name" name="name" type="text" autocomplete="name" maxlength="100" required>
+
+        <label for="contact">Contact number</label>
+        <input id="contact" name="contact" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required>
+
+        <button id="submit" type="submit">Participate!</button>
+        <p id="msg" class="msg" role="status" aria-live="polite"></p>
+        <p class="note">Your name and number are shared only with the event organizers.</p>
+      </form>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const form = document.getElementById("rsvp");
+    const msg = document.getElementById("msg");
+    const btn = document.getElementById("submit");
+
+    function show(text, isError) {
+      msg.textContent = text;
+      msg.className = "msg" + (isError ? " error" : "");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = form.name.value.trim();
+      const contact = form.contact.value.trim();
+
+      if (name.length < 2) return show("Please enter your name.", true);
+      if (!/^[0-9+ ()-]{7,20}$/.test(contact))
+        return show("Enter a valid contact number (digits, spaces, + ( ) - only).", true);
+
+      btn.disabled = true;
+      show("Saving…", false);
+
+      // No .select() here: visitors are allowed to insert but never to read.
+      const { error } = await db.from("attendees").insert({ name, contact });
+
+      btn.disabled = false;
+      if (error) {
+        if (error.code === "23505") return show("This number is already registered.", true);
+        return show("Something went wrong. Please try again.", true);
+      }
+      form.reset();
+      show("You're in! See you at the event.", false);
+    });
+  </script>
+</body>
+</html>

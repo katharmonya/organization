@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Attendees – Katharmonya Event</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page wide">
+    <h1>Attendees</h1>
+
+    <!-- Admin login -->
+    <section id="login" class="panel" style="max-width:480px;margin:0 auto;">
+      <form id="loginForm">
+        <label for="email">Admin email</label>
+        <input id="email" type="email" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Sign in</button>
+        <p id="loginMsg" class="msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <!-- Attendee list (admin only) -->
+    <section id="dash" class="panel hidden">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search name or number" aria-label="Search attendees">
+        <button id="csv" type="button">Download CSV</button>
+        <button id="logout" type="button">Sign out</button>
+      </div>
+      <p id="count" class="count"></p>
+      <ul id="list" class="list"></ul>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const $ = (id) => document.getElementById(id);
+    let rows = [];
+
+    async function route() {
+      const { data: { session } } = await db.auth.getSession();
+      $("login").classList.toggle("hidden", !!session);
+      $("dash").classList.toggle("hidden", !session);
+      if (session) load();
+    }
+
+    $("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("loginMsg").textContent = "";
+      const { error } = await db.auth.signInWithPassword({
+        email: $("email").value.trim(),
+        password: $("password").value,
+      });
+      if (error) {
+        $("loginMsg").textContent = "Wrong email or password.";
+        $("loginMsg").className = "msg error";
+        return;
+      }
+      $("password").value = "";
+      route();
+    });
+
+    $("logout").addEventListener("click", async () => { await db.auth.signOut(); rows = []; route(); });
+
+    async function load() {
+      const { data, error } = await db.from("attendees")
+        .select("id, name, contact, created_at")
+        .order("created_at", { ascending: false });
+      if (error) { $("count").textContent = "Could not load attendees."; return; }
+      rows = data;
+      render();
+    }
+
+    function render() {
+      const q = $("search").value.trim().toLowerCase();
+      const shown = rows.filter(r => r.name.toLowerCase().includes(q) || r.contact.includes(q));
+      $("count").textContent = `${rows.length} attendee${rows.length === 1 ? "" : "s"}` +
+        (q ? ` (${shown.length} shown)` : "");
+      const list = $("list");
+      list.replaceChildren();
+      if (!shown.length) {
+        const li = document.createElement("li");
+        li.className = "empty";
+        li.textContent = rows.length ? "No matches." : "No one has joined yet.";
+        list.append(li);
+        return;
+      }
+      for (const r of shown) {
+        const li = document.createElement("li");
+        li.className = "item";
+        const who = Object.assign(document.createElement("span"), { className: "who", textContent: r.name });
+        const tel = Object.assign(document.createElement("a"), {
+          className: "tel", textContent: r.contact, href: "tel:" + r.contact.replace(/[^0-9+]/g, "")
+        });
+        const when = Object.assign(document.createElement("span"), {
+          className: "when", textContent: new Date(r.created_at).toLocaleString()
+        });
+        const del = Object.assign(document.createElement("button"), {
+          className: "del", type: "button", textContent: "Remove"
+        });
+        del.addEventListener("click", async () => {
+          if (!confirm(`Remove ${r.name}?`)) return;
+          const { error } = await db.from("attendees").delete().eq("id", r.id);
+          if (error) return alert("Could not remove. Try again.");
+          rows = rows.filter(x => x.id !== r.id);
+          render();
+        });
+        li.append(who, tel, when, del);
+        list.append(li);
+      }
+    }
+    $("search").addEventListener("input", render);
+
+    $("csv").addEventListener("click", () => {
+      // Prefix risky cells so spreadsheets don't run them as formulas
+      const safe = (v) => `"${(/^[=+\-@]/.test(v) ? "'" + v : v).replace(/"/g, '""')}"`;
+      const csv = ["Name,Contact,Registered"]
+        .concat(rows.map(r => [safe(r.name), safe(r.contact), safe(r.created_at)].join(",")))
+        .join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = "katharmonya-attendees.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    route();
+  </script>
+</body>
+</html>
