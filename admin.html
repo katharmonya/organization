@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attendees – Katharmonya Event</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="screen">
+    <h1>Attendees</h1>
+    <section class="card">
+      <p class="count" id="count" aria-live="polite"></p>
+      <ul id="list"></ul>
+    </section>
+  </main>
+  <script src="config.js"></script>
+  <script>
+    const list = document.getElementById('list');
+    const count = document.getElementById('count');
+    async function load() {
+      try {
+        const res = await fetch(API_URL + '/api/attendees');
+        if (!res.ok) throw new Error();
+        const rows = await res.json();
+        count.textContent = rows.length
+          ? rows.length + (rows.length === 1 ? ' attendee' : ' attendees')
+          : 'No one has signed up yet. New sign-ups appear here automatically.';
+        list.replaceChildren(...rows.map((r) => {
+          const li = document.createElement('li');
+          const n = document.createElement('strong'); n.textContent = r.name;
+          const c = document.createElement('span');
+          c.textContent = r.contact + ' · ' + new Date(r.created_at).toLocaleString();
+          li.append(n, c);
+          return li;
+        }));
+      } catch {
+        count.textContent = 'Could not load attendees. Retrying…';
+      }
+    }
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>

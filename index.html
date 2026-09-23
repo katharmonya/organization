@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Katharmonya Event</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="screen">
+    <h1>KATHARMONYA<br>EVENT</h1>
+    <form id="form" class="card" novalidate>
+      <label for="name">Your name</label>
+      <input id="name" name="name" required maxlength="100" autocomplete="name">
+      <label for="contact">Contact number</label>
+      <input id="contact" name="contact" required inputmode="tel" maxlength="20" autocomplete="tel">
+      <button type="submit">Participate!</button>
+      <p id="msg" role="status"></p>
+    </form>
+  </main>
+  <script src="config.js"></script>
+  <script>
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector('button');
+      btn.disabled = true; msg.className = ''; msg.textContent = '';
+      try {
+        const res = await fetch(API_URL + '/api/attendees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.name.value, contact: form.contact.value })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        form.reset();
+        msg.textContent = "You're registered. See you at the event!";
+      } catch (err) {
+        msg.className = 'err';
+        msg.textContent = err.message || 'Could not submit. Check your connection and try again.';
+      } finally { btn.disabled = false; }
+    });
+  </script>
+</body>
+</html>
